@@ -9,9 +9,14 @@ WriteMakefile(
 	      NAME		=> $name,
 	      VERSION_FROM	=> $mainfile,
 	      PREREQ_PM => {
-		  'Curses::UI'          => 0.72,
+		  'Curses::UI'          => 0.80,
 		  'Module::ScanDeps'    => 0,
+		  'File::Spec'          => 0,
 		  'File::chdir'         => 0,
+		  'Pod::Text'           => 0,
+		  'Cwd'                 => 0,
+		  'CPANPLUS'            => 0.045,
+		  'Test::Pod'           => 0,
 	      },
 
 	      ABSTRACT_FROM => $mainfile,
