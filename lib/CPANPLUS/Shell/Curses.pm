@@ -14,14 +14,14 @@ use warnings;
 BEGIN {
     use vars        qw( $VERSION @ISA);
     @ISA        =   qw( CPANPLUS::Shell::_Base );
-    $VERSION    =   '0.06'; #go with the CP minor number
+    $VERSION    =   '0.07'; #go with the CP minor number
 }
 
 use CPANPLUS::Backend;
 use CPANPLUS::I18N;
 
 use Curses;
-use Curses::UI 0.87;
+use Curses::UI 0.93;
 use Pod::Text;
 use File::Spec;
 use File::chdir;
@@ -299,11 +299,11 @@ sub _search_author_init{
 
 sub _search_author{
     my $input = shift;
-    if ($input->get()) {
-	my $author = $input->get();
+    if (my $string = $input->get()) {
+	my $regex = qr/$string/i;
 	$mainw->status(-message => loc("Searching..."),-fg => "blue",
 		                           -bfg => "blue");
-	$data = $cpanp->search(type => 'author', list=> [uc($author)], 'data' => $data);
+	$data = $cpanp->search(type => 'author', list=> [$regex], 'data' => $data);
 	if (defined($data) && (int keys %{$data} > 0)) {
 	    _display_results($data);
 	    _show_installed();
@@ -332,10 +332,11 @@ sub _search_module_init{
 sub _search_module{
     my $input = shift;
 
-    if ($input->get()) {
+    if (my $string = $input->get()) {
+	my $regex = qr/$string/i;
 	$mainw->status(-message => loc("Searching..."),-fg => "blue",
 		                      -bfg => "blue");
-	$data = $cpanp->search(type => 'module', list=> [$input->get()], 'data' => $data);
+	$data = $cpanp->search(type => 'module', list=> [$regex], 'data' => $data);
 	if (defined($data) && (int keys %{$data} > 0)) {
 	    _display_results($data);
 	    _show_installed();
@@ -362,10 +363,11 @@ sub _search_dist_init{
 
 sub _search_dist{
     my $input = shift;
-    if ($input->get()) {
+    if (my $string = $input->get()) {
+	my $regex = qr/$string/i;
 	$mainw->status(-message => loc("Searching..."),-fg => "blue",
 		                      -bfg => "blue");
-	my $results = $cpanp->search(type => 'distribution', list=> [$input->get()]);
+	my $results = $cpanp->search(type => 'distribution', list=> [$regex]);
 	if (defined($results) && (int keys %{$data} > 0)) {
 	    _display_results($results);
 	} else {

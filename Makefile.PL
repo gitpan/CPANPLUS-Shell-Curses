@@ -9,7 +9,7 @@ WriteMakefile(
 	      NAME		=> $name,
 	      VERSION_FROM	=> $mainfile,
 	      PREREQ_PM => {
-		  'Curses::UI'          => 0.87,
+		  'Curses::UI'          => 0.93,
 		  'Module::ScanDeps'    => 0,
 		  'File::Spec'          => 0,
 		  'File::chdir'         => 0,
