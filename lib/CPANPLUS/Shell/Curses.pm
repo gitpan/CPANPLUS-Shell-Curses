@@ -1,7 +1,7 @@
 ##################################################
 ###            CPANPLUS/Shell/Curses.pm        ###
 ### Module to provide a shell to the CPAN++    ###
-### 2003 (c) by Marcus Thiesen                 ###
+### 2003-2004 (c) by Marcus Thiesen            ###
 ### marcus@cpan.org                            ###
 ##################################################
 
@@ -14,14 +14,14 @@ use warnings;
 BEGIN {
     use vars        qw( $VERSION @ISA);
     @ISA        =   qw( CPANPLUS::Shell::_Base );
-    $VERSION    =   '0.05'; #go with the CP minor number
+    $VERSION    =   '0.06'; #go with the CP minor number
 }
 
 use CPANPLUS::Backend;
 use CPANPLUS::I18N;
 
 use Curses;
-use Curses::UI 0.75;
+use Curses::UI 0.87;
 use Pod::Text;
 use File::Spec;
 use File::chdir;
@@ -114,6 +114,7 @@ my $mainw;
 my $cpanp;
 my $data;
 my %install_params;
+my %updated;
 sub shell {
     ### Init CPANPLUS
     $cpanp = new CPANPLUS::Backend;
@@ -141,8 +142,9 @@ sub shell {
     my $list = $mainw->getobj('listw')->getobj('list');
 
     $mainw->draw();
-    $mainw->status(loc("Loading..."), -fg => "blue",
-		                      -bfg => "blue");
+    $mainw->status(-message => loc("Loading..."), 
+		   -fg => "blue",
+		   -bfg => "blue");
     
     ### Apply the keybindings
     $list->set_routine("_quit", \&_quit );
@@ -188,6 +190,9 @@ sub shell {
     foreach my $key (keys %$default_mode) {
 	$list->set_binding($default_mode->{$key}, $key);
     }
+
+    ### Make the update check at the beginning
+    _look_for_updates();
  
     _display_results($data);
     _show_installed();
@@ -217,7 +222,7 @@ sub init_screen{
 			   'Window',
 			   '-height' => $top_height,
 			   '-border' => 1, 
-			   '-title' => loc('CPANPLUS::Shell::Curses'),
+			   '-title' => loc('CPANPLUS::Shell::Curses') . " $VERSION",
 			   '-tfg'   => "green",
 			   '-tbg'   => "white",
 			   '-bfg'   => "red",
@@ -259,6 +264,7 @@ sub init_screen{
 			   'vscrollbar' => 'right',
 			   '-multi' => 1,
 			   '-fg' => "green",
+			   '-htmltext' => 1,
 			   );
 
     $list->set_routine('_display_module_details',\&_display_module_details);
@@ -295,14 +301,14 @@ sub _search_author{
     my $input = shift;
     if ($input->get()) {
 	my $author = $input->get();
-	$mainw->status(loc("Searching..."),-fg => "blue",
+	$mainw->status(-message => loc("Searching..."),-fg => "blue",
 		                           -bfg => "blue");
 	$data = $cpanp->search(type => 'author', list=> [uc($author)], 'data' => $data);
 	if (defined($data) && (int keys %{$data} > 0)) {
 	    _display_results($data);
 	    _show_installed();
 	} else {
-	    $mainw->status(loc("Nothing found!"));
+	    $mainw->status(-message => loc("Nothing found!"));
 	}
     }
     _input_cleanup();
@@ -327,14 +333,14 @@ sub _search_module{
     my $input = shift;
 
     if ($input->get()) {
-	$mainw->status(loc("Searching..."),-fg => "blue",
+	$mainw->status(-message => loc("Searching..."),-fg => "blue",
 		                      -bfg => "blue");
 	$data = $cpanp->search(type => 'module', list=> [$input->get()], 'data' => $data);
 	if (defined($data) && (int keys %{$data} > 0)) {
 	    _display_results($data);
 	    _show_installed();
 	} else {
-	    $mainw->error(loc("Nothing found!"));
+	    $mainw->error(-message => loc("Nothing found!"));
 	}
     }
     _input_cleanup();
@@ -357,13 +363,13 @@ sub _search_dist_init{
 sub _search_dist{
     my $input = shift;
     if ($input->get()) {
-	$mainw->status(loc("Searching..."),-fg => "blue",
+	$mainw->status(-message => loc("Searching..."),-fg => "blue",
 		                      -bfg => "blue");
 	my $results = $cpanp->search(type => 'distribution', list=> [$input->get()]);
 	if (defined($results) && (int keys %{$data} > 0)) {
 	    _display_results($results);
 	} else {
-	    $mainw->error(loc("Nothing found!"));
+	    $mainw->error(-message => loc("Nothing found!"));
 	}
 	_input_cleanup(); }
 }
@@ -371,17 +377,17 @@ sub _search_dist{
 
 sub _readme{
     my $list = $mainw->getobj('listw')->getobj('list');
-    my $current_module = $list->get_active_value();
+    my $current_module = _strip_name($list->get_active_value());
     my $err  = $cpanp->error_object();
 
-    $mainw->status(loc('Getting readme for ') . $current_module,-fg => "blue",
+    $mainw->status(-message => loc('Getting readme for ') . $current_module,-fg => "blue",
 		                      -bfg => "blue");
 
     my $readme = $cpanp->readme('modules' => [$current_module]);
 
     unless ($readme->ok()) { 
 	 _draw();
-	 $mainw->error(loc("Could not get readme: ") . $err->stack());
+	 $mainw->error(-message => loc("Could not get readme: ") . $err->stack());
 	 return;
      } 
 
@@ -421,8 +427,8 @@ sub _show_installed{
     my $list = $mainw->getobj('listw')->getobj('list');
 
     ### Tell the user what lasts that long ;-)
-    $mainw->status(loc('Loading installed...'), -fg => "blue",
-		   -bfg => "blue");
+    $mainw->status(-message => loc('Loading installed...'), -fg => "blue",
+		   -bfg => "blue" );
     $list->clear_selection();
 
     ### First, get a sorted array of all installed mods
@@ -447,8 +453,8 @@ sub _fetch{
     my $installed = $cpanp->installed();
     my $mods = $installed->{'rv'};
     my @instmods = sort { uc($a) cmp uc($b) } keys %$mods;
-    my $current_module = $list->get_active_value();
-    my @selection = $list->get();
+    my $current_module = _strip_name($list->get_active_value());
+    my @selection = map _strip_name($_), $list->get();
 
     my %look_tbl;
     my @to_fetch;
@@ -465,7 +471,7 @@ sub _fetch{
     my @endmessage;
 
     foreach my $mod (@to_fetch) {
-	$mainw->status(loc('Currently fetching ') . $mod, -fg => "blue",
+	$mainw->status(-message => loc('Currently fetching ') . $mod, -fg => "blue",
 		   -bfg => "blue");
 		my $iresult = $cpanp->fetch(modules => [$mod]);
 	if ($iresult->ok()) {
@@ -477,7 +483,7 @@ sub _fetch{
 	}
 	_draw();
     }
-    $mainw->dialog(join("\n",@endmessage),-fg => "blue",
+    $mainw->dialog(-message => join("\n",@endmessage),-fg => "blue",
 		   -bfg => "blue");
     _show_installed();
 }
@@ -487,9 +493,9 @@ sub _extract {
     my $installed = $cpanp->installed();
     my $mods = $installed->{'rv'};
     my @instmods = sort { uc($a) cmp uc($b) } keys %$mods;
-     my $current_module = $list->get_active_value();
+     my $current_module = _strip_name($list->get_active_value());
 
-    my @selection = $list->get();
+    my @selection = map _strip_name($_), $list->get();
 
     my %look_tbl;
     my @to_fetch;
@@ -504,12 +510,12 @@ sub _extract {
     push @to_fetch, $current_module unless (@to_fetch > 0);
     my @endmessage;
     foreach my $mod (@to_fetch) {
-	$mainw->status(loc('Currently fetching ') . $mod ,-fg => "blue",
+	$mainw->status(-message => loc('Currently fetching ') . $mod ,-fg => "blue",
 		   -bfg => "blue");
 	my $iresult = $cpanp->fetch(modules => [$mod]);
 	if ($iresult->ok()) {
 	    _draw();
-	    $mainw->status(loc('Currently extracting ') . $mod,-fg => "blue",
+	    $mainw->status(-message => loc('Currently extracting ') . $mod,-fg => "blue",
 		   -bfg => "blue");
 	    $data->{$mod}->extract();
 	} else {
@@ -519,7 +525,7 @@ sub _extract {
 	_draw();
     }
     _show_installed();
-    $mainw->dialog(join("\n",@endmessage),-fg => "blue",
+    $mainw->dialog( -message => join("\n",@endmessage),-fg => "blue",
 		   -bfg => "blue") if (@endmessage > 0);
 }
 
@@ -550,20 +556,18 @@ sub _install{
     my $list = $mainw->getobj('listw')->getobj('list');
     my $installed = $cpanp->installed();
     my $mods = $installed->{'rv'};
-    my $current_module = $list->get_active_value();
+    my $current_module = _strip_name($list->get_active_value());
     my @instmods = sort { uc($a) cmp uc($b) } keys %$mods;
 
-    my @selection = $list->get();
+    my @selection = map _strip_name($_),$list->get();
 
     my %look_tbl;
     my @to_install;
 
     map $look_tbl{$_}++, @instmods;
- 
-    foreach my $item (@selection) {
-	unless ($look_tbl{$item}) {
-	    push @to_install, $item;
-	}
+
+    for (@selection) {
+	push @to_install, $_ unless $look_tbl{$_};
     }
 
     my $err = $cpanp->error_object();
@@ -595,7 +599,7 @@ sub _install{
     _show_installed();	
     _draw();
     reset_curses();
-    $mainw->dialog(join("\n", @endmessage),-fg => "blue",
+    $mainw->dialog( -message => join("\n", @endmessage),-fg => "blue",
 		   -bfg => "blue");
 }
 
@@ -604,8 +608,8 @@ sub _uninstall{
     my $installed = $cpanp->installed();
     my $mods = $installed->{'rv'};
     my @instmods = sort { uc($a) cmp uc($b) } keys %$mods;
-    my $current_module = $list->get_active_value();
-    my @selection = $list->get();
+    my $current_module = _strip_name($list->get_active_value());
+    my @selection = map _strip_name($_),$list->get();
 
 
     my %look_tbl;
@@ -707,18 +711,7 @@ sub _expand_inc{
 ### where scheduled for update
 
 sub _uptodate{
-    $mainw->status(loc('Looking for updated modules...'),-fg => "blue",
-		   -bfg => "blue");
-    my $installed = $cpanp->installed();
-    my $instmods = $installed->{'rv'};
-    my %newdata;
-    foreach my $module (keys %$instmods) {
-	my $uptodate = $cpanp->uptodate('modules' => [$module]);
-	next unless defined $uptodate;
-	next if $uptodate->rv()->{$module}->{uptodate};
-	$newdata{$module} = $data->{$module};
-    }
-    $data = \%newdata;
+    $data = \%updated;
     
     my $list = $mainw->getobj('listw')->getobj('list');
     
@@ -733,7 +726,7 @@ sub _uptodate{
 		   loc('To abort, press q')
 		   );
     _draw();
-    $mainw->dialog(join("\n",@message),-fg => "blue",
+    $mainw->dialog( -message => join("\n",@message),-fg => "blue",
 		   -bfg => "blue");
 
     _display_results();
@@ -742,7 +735,7 @@ sub _uptodate{
 
 sub leave_update{
     my $list = $mainw->getobj('listw')->getobj('list');
-    my @selection = $list->get();    
+    my @selection = map _strip_name($_), $list->get();    
     my $err = $cpanp->error_object();
     leave_curses();
     print loc("Went back to shell to update ") . "\n";
@@ -754,12 +747,18 @@ sub leave_update{
     _fetch_modules(@selection);
     print "Installing...\n";
 
-    my $iresult = $cpanp->install(modules => \@selection,
+    foreach my $module (@selection) {
+	print "\t$module...\n";
+
+	my $iresult = $cpanp->install(modules => [$module],
 				      target => 'install');
-    if ($iresult->ok()) {
-	push @endmessage, loc("All modules updated successfully");
-    } else {
-	   @endmessage = $err->stack();
+	if ($iresult->ok()) {
+	    push @endmessage, loc("$module updated successfully");
+	    delete $data->{$module}
+	      if (defined $data->{$module});
+	} else {
+	    push @endmessage, loc("$module failed update");
+	}
     }
 
     #Reset default bindings
@@ -769,7 +768,7 @@ sub leave_update{
     _show_all();
     _show_installed();	
     reset_curses();
-    $mainw->dialog(join("\n", @endmessage),-fg => "blue",
+    $mainw->dialog( -message => join("\n", @endmessage),-fg => "blue",
 		   -bfg => "blue");
 }
 
@@ -802,13 +801,14 @@ sub _eval_expr{
     my $expr = $input->get();
     return unless defined $expr;
 
-    $mainw->status(loc("Executing..."),-fg => "blue",
+    $mainw->status(-message => loc("Executing..."),-fg => "blue",
 		   -bfg => "blue");
     eval($expr);
-    $mainw->error($@ . "\n" . $!) if ($@) or ($!);
+    $mainw->error(-message => $@ . "\n" . $!) if ($@) or ($!);
     _input_cleanup();
     _draw();
 }
+
 sub _install_params_init{
     my $topw = $mainw->getobj('topw');
 
@@ -881,7 +881,7 @@ sub _show_cache{
 }
 
 sub _quit{
-    $mainw->status(loc("Exiting..."),-fg => "blue",
+    $mainw->status(-message => loc("Exiting..."),-fg => "blue",
 		   -bfg => "blue");
     exit 0;
 }
@@ -890,7 +890,27 @@ sub _display_results{
     my $values = (shift  || $data);
     my @displaymod = sort { uc($a) cmp uc($b) }(keys(%$values));
 
-    $mainw->getobj('listw')->getobj('list')->values(\@displaymod);
+    my @newdisplaymod;
+    my %seen;
+
+    ### filter for same package and underline updated:
+    foreach my $module (@displaymod) {
+
+	my $details = $data->{$module};
+	if (defined $details->{'package'} and $seen{$details->{'package'}}) {
+	    delete $values->{$module};
+	    next;
+	};
+	$seen{$details->{'package'}}++ if defined $details->{'package'};
+
+	$module = "<bold><underline>$module</underline></bold>" 
+	    if $updated{$module};
+
+	push @newdisplaymod, $module;
+    }
+
+    ### Show all the stuff:
+    $mainw->getobj('listw')->getobj('list')->values(\@newdisplaymod);
     $mainw->getobj('listw')->getobj('list')->draw();
 }
 
@@ -910,7 +930,7 @@ sub _goto_list{
 sub _display_module_details{
     my $list = $mainw->getobj('listw')->getobj('list');
 
-    my $current_module = $list->get_active_value();
+    my $current_module = _strip_name($list->get_active_value());
     return unless defined $current_module;
 
     my $details = $data->{$current_module};
@@ -1057,7 +1077,7 @@ sub _store_conf{
     ### it doesn't save the config as it was meant to.
     unless ($config->can_save($filename)) {
 	_draw();
-	$mainw->error(loc("You are not allowed to write to ") 
+	$mainw->error(-message => loc("You are not allowed to write to ") 
 		      . $filename . "\n" .
 		      loc("Config will be discared after exit"));
     } else {
@@ -1070,7 +1090,7 @@ sub _store_conf{
     $mainw->getobj('listw')->getobj('list')->focus();
 
     ###
-    ### Somewhere here something odd happens, the curses
+    ### Somewhere here something odd happens, the cursor
     ### appears in the list. No workaround till now, 
     ### maybe a bug in Curses::UI
 }
@@ -1140,13 +1160,13 @@ sub _print_stack{
 	push @errors, loc("No errors occured yet");
     }
     _draw();
-    $mainw->dialog(join("\n",@errors),-fg => "blue",
+    $mainw->dialog( -message => join("\n",@errors),-fg => "blue",
 		   -bfg => "blue" );
 }
 
 sub _show_perldoc{
     my $list = $mainw->getobj('listw')->getobj('list');
-    my $current_module = $list->get_active_value();
+    my $current_module = _strip_name($list->get_active_value());
     my $err  = $cpanp->error_object();
 
     my $installed = $cpanp->installed();
@@ -1174,17 +1194,21 @@ sub _show_perldoc{
 }
 
 sub _reload_indices{
-    $mainw->status(loc('Reloading CPAN indices...'),-fg => "blue",
+    $mainw->status(-message => loc('Reloading CPAN indices...'),-fg => "blue",
 		   -bfg => "blue");
     my $err  = $cpanp->error_object();
 
     my $result = $cpanp->reload_indices('update_source' => 1);
     _draw();
     if ($result) {
-	$mainw->dialog(loc('Successfully reloaded CPAN indices!'),-fg => "blue", -bfg => "blue");
+	$mainw->dialog(-message => loc('Successfully reloaded CPAN indices!'),-fg => "blue", -bfg => "blue");
     } else {
-	$mainw->error(loc('An error occured during reload: ') ."\n" . $err->stack());
+	$mainw->error( -message => loc('An error occured during reload: ') ."\n" . $err->stack());
     }
+    _look_for_updates();
+    $data = $cpanp->module_tree();
+    _display_results($data);
+    _show_installed();
 }
 
 sub _open_prompt{
@@ -1194,13 +1218,13 @@ sub _open_prompt{
 
     my $list = $mainw->getobj('listw')->getobj('list');
 
-    my $current_module = $list->get_active_value();
+    my $current_module = _strip_name($list->get_active_value());
     return unless defined $current_module;
 
     my $details = $data->{$current_module};
     return unless defined $details;
 
-    $mainw->status(loc('Extracting ') . $current_module,-fg => "blue",
+    $mainw->status(-message => loc('Extracting ') . $current_module,-fg => "blue",
 		   -bfg => "blue");
     local $CWD = $details->extract();
     $mainw->nostatus();
@@ -1220,35 +1244,35 @@ sub _open_prompt{
 
 sub _write_bundle{
     my $err  = $cpanp->error_object();
-    $mainw->status(loc('Writing a autobundle...'),-fg => "blue",
+    $mainw->status(-message => loc('Writing a autobundle...'),-fg => "blue",
 		   -bfg => "blue");
 
     my $rv = $cpanp->autobundle();
     _draw();
     if ($rv->ok()) {
 	my $name = $rv->rv();
-	$mainw->dialog(loc("Auobundle ") . $name . loc(" successfully written"), -fg => "blue",
+	$mainw->dialog(-message => loc("Auobundle ") . $name . loc(" successfully written"), -fg => "blue",
 		   -bfg => "blue");
     } else {
-	$mainw->error(loc('An error occured during bundling: ') ."\n" . $err->stack());
+	$mainw->error(-message => loc('An error occured during bundling: ') ."\n" . $err->stack());
     } 
 }
 
 sub _show_reports_init{
     my $list = $mainw->getobj('listw')->getobj('list');
-    my $current_module = $list->get_active_value();
+    my $current_module = _strip_name($list->get_active_value());
     my $err  = $cpanp->error_object();
 
     next unless $current_module;
 
-    $mainw->status(loc('Getting reports for ') . $current_module,-fg => "blue",
+    $mainw->status(-message => loc('Getting reports for ') . $current_module,-fg => "blue",
 		   -bfg => "blue");
 
     my $reports = $cpanp->reports('modules' => [$current_module]);
 
     unless ($reports->ok()) { 
 	 _draw();
-	 $mainw->error(loc("Could not get report: ") . $err->stack());
+	 $mainw->error(-message => loc("Could not get report: ") . $err->stack());
 	 return;
      } 
     my @text;
@@ -1288,16 +1312,16 @@ sub _extract_files{
     my $err = $cpanp->error_object();
 
     foreach my $mod (@to_extract) {
-	$mainw->status(loc('Currently extracting') . $mod,-fg => "blue",
+	$mainw->status(-message => loc('Currently extracting') . $mod,-fg => "blue",
 		   -bfg => "blue");
 	my $iresult = $cpanp->extract(modules => [$mod]);
 	if ($iresult->ok()) {
 	    _draw();
-	    $mainw->dialog($mod . loc(" extracted successfully"),-fg => "blue",
+	    $mainw->dialog(-message => $mod . loc(" extracted successfully"),-fg => "blue",
 		   -bfg => "blue");
 	} else {
 	    _draw();
-	   $mainw->error(loc("Error extracting ") . $mod . "\n" . $err->stack());
+	   $mainw->error(-message => loc("Error extracting ") . $mod . "\n" . $err->stack());
 	}
 	_draw();
     }
@@ -1316,17 +1340,17 @@ sub _show_banner{
 		 loc('             Using CPANPLUS::Backend v'.$bversion.'            '),
 		 );
     _draw();
-    $mainw->dialog(join("\n",@text),-fg => "blue",
+    $mainw->dialog(-message => join("\n",@text),-fg => "blue",
 		   -bfg => "blue");
 }
 
 
 sub _search_module_author{
-    $mainw->status(loc("Searching..."),-fg => "blue",
+    $mainw->status(-message => loc("Searching..."),-fg => "blue",
 		   -bfg => "blue");
     my $list = $mainw->getobj('listw')->getobj('list');
 
-    my $current_module = $list->get_active_value();
+    my $current_module = _strip_name($list->get_active_value());
     return unless defined $current_module;
 
     my $details = $data->{$current_module};
@@ -1334,7 +1358,7 @@ sub _search_module_author{
 
     my $author = $details->{'author'};
     return unless defined $author;
-    $mainw->status(loc("Searching for ") . $author,-fg => "blue",
+    $mainw->status(-message => loc("Searching for ") . $author,-fg => "blue",
 		   -bfg => "blue" );
 
     $data = $cpanp->search(type => 'author', list=> [$author]);
@@ -1342,51 +1366,51 @@ sub _search_module_author{
 	_display_results($data);
 	_show_installed();
     } else {
-	$mainw->error(loc("Nothing found!"));
+	$mainw->error(-message => loc("Nothing found!"));
     }
 }
 
 sub _search_namespace_module{
-    $mainw->status(loc("Searching..."),-fg => "blue",
+    $mainw->status(-message => loc("Searching..."),-fg => "blue",
 		   -bfg => "blue");
     my $list = $mainw->getobj('listw')->getobj('list');
 
-    my $current_module = $list->get_active_value();
+    my $current_module = _strip_name($list->get_active_value());
     return unless defined $current_module;
 
     if ($current_module =~ /(\w+)/) {
 	my $namespace = $1;
-	$mainw->status(loc("Searching in Namespace ") . $namespace,-fg => "blue",
+	$mainw->status(-message => loc("Searching in Namespace ") . $namespace,-fg => "blue",
 		   -bfg => "blue");
 	$data = $cpanp->search(type => 'module', list=> ["^$namespace"]);
 	if (defined($data)) {
 	    _display_results($data);
 	    _show_installed();
 	} else {
-	    $mainw->error(loc("Nothing found!"));
+	    $mainw->error(-message => loc("Nothing found!"));
 	}
     }
     $mainw->nostatus();
 }
 
 sub _search_namespace_module2{
-    $mainw->status(loc("Searching..."),-fg => "blue",
+    $mainw->status(-message => loc("Searching..."),-fg => "blue",
 		   -bfg => "blue");
     my $list = $mainw->getobj('listw')->getobj('list');
 
-    my $current_module = $list->get_active_value();
+    my $current_module = _strip_name($list->get_active_value());
     return unless defined $current_module;
 
     if ($current_module =~ /(\w+::\w+)/) {
 	my $namespace = $1;
-	$mainw->status(loc("Searching in Namespace ") . $namespace,-fg => "blue",
+	$mainw->status(-message => loc("Searching in Namespace ") . $namespace,-fg => "blue",
 		   -bfg => "blue");
 	$data = $cpanp->search(type => 'module', list=> ["^$namespace"]);
 	if (defined($data)) {
 	    _display_results($data);
 	    _show_installed();
 	} else {
-	    $mainw->error(loc("Nothing found!"));
+	    $mainw->error(-message => loc("Nothing found!"));
 	}
     }
     $mainw->nostatus();
@@ -1394,7 +1418,7 @@ sub _search_namespace_module2{
 
 sub _show_deps{
     my $list = $mainw->getobj('listw')->getobj('list');
-    my $current_module = $list->get_active_value();
+    my $current_module = _strip_name($list->get_active_value());
     my $err  = $cpanp->error_object();
 
     my $installed = $cpanp->installed();
@@ -1402,7 +1426,7 @@ sub _show_deps{
 
     return unless defined $instmods->{$current_module};
 
-    $mainw->status(loc("Searching dependencies for ") .  $current_module,-fg => "blue",
+    $mainw->status(-message => loc("Searching dependencies for ") .  $current_module,-fg => "blue",
 		   -bfg => "blue");
 
     my $hashref = Module::ScanDeps::scan_deps($instmods->{$current_module});
@@ -1422,7 +1446,7 @@ sub _show_deps{
 }
 
 sub _show_stats{
-    $mainw->status(loc("Gathering statistical information..."),-fg => "blue",
+    $mainw->status(-message => loc("Gathering statistical information..."),-fg => "blue",
 		   -bfg => "blue");
     my $installed = $cpanp->installed();
     my $instmods = $installed->{'rv'};
@@ -1440,7 +1464,7 @@ sub _show_stats{
     my $number_total = keys %{$modules};
     my $number_authors = keys %{$authors};
 
-    $mainw->dialog( loc('Installed Modules: ') . $number_installed . "\n"
+    $mainw->dialog( -message => loc('Installed Modules: ') . $number_installed . "\n"
 		   .loc('Outdated Modules: ') . $number_outdated . "\n\n"
 		   .loc('Modules on CPAN: ') . $number_total . "\n"
 		   .loc('Registered Authors: ') . $number_authors . "\n\n"
@@ -1458,6 +1482,29 @@ sub _select_all{
 	$list->set_selection($i);
     }
 }
+
+sub _look_for_updates{
+    $mainw->status(-message => loc('Looking for updated modules...'),-fg => "blue",
+		   -bfg => "blue");
+    my $installed = $cpanp->installed();
+    my $instmods = $installed->{'rv'};
+    foreach my $module (keys %$instmods) {
+	my $uptodate = $cpanp->uptodate('modules' => [$module]);
+	next unless defined $uptodate;
+	next if $uptodate->rv()->{$module}->{uptodate};
+	$updated{$module} = $data->{$module};
+    }
+}
+
+sub _strip_name{
+    my $module = shift;
+    return unless defined $module;
+    if ($module =~ />([^<]+)</) {
+	return $1;
+    }
+    return $module;
+}
+
 
 1;
 
@@ -1520,7 +1567,7 @@ o      update check
 
 j      display all modules
 
-k      diplay installed modules
+k      display installed modules
 
 w      show search cache
 
