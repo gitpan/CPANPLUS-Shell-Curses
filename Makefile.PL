@@ -1,0 +1,21 @@
+use strict;
+### write the Makefile ###
+use ExtUtils::MakeMaker;
+
+my $name     = 'CPANPLUS::Shell::Curses';
+my $mainfile = 'lib/CPANPLUS/Shell/Curses.pm';
+
+WriteMakefile(
+	      NAME		=> $name,
+	      VERSION_FROM	=> $mainfile,
+	      PREREQ_PM => {
+		  'Curses::UI'          => 0.72,
+		  'Module::ScanDeps'    => 0,
+	      },
+
+	      ABSTRACT_FROM => $mainfile,
+	      AUTHOR => 'Marcus Thiesen (marcus@cpan.thiesenweb.de)',
+	      
+	      MAN3PODS => { $mainfile => $name }
+
+	      );

@@ -1,0 +1,143 @@
+NAME
+    CPANPLUS::Shell::Curses - A Curses based shell for CPANPLUS
+
+ABSTRACT
+    CPANPLUS::Shell::Curses is a graphical user interface to the newly
+    developed CPANPLUS package
+
+USAGE
+    Usually all operations will be performed on the currently selected
+    and/or marked Module. Searching is done as incremental search, so first
+    author then module gives you other results than first module than
+    author. Reset searching/display with j.
+
+    *For installing and updating the Shell leaves Curses mode. At the moment
+    this is considered a feature, in order to answer module's questions
+    about configuration.*
+
+KEYS
+  General
+    h detailed help
+
+    q exit
+
+    v version information
+
+  Search
+    a search by author(s)
+
+    A search modules by the author of the currently active module
+
+    m search by module(s)
+
+    M search modules in the same top level Namespace as the currently active
+    one (i.e. if CPAN is active it will show you only modules CPAN::*)
+
+    N search modules in the same top and second level namespace as the
+    currently active one (i.e. AI::Categorizer is active it will show you
+    only the ones under AI::Categorizer)
+
+    o update check
+
+    j display all modules
+
+    k diplay installed modules
+
+    w show search cache
+
+  List window functions
+    / does a search in the list window as well in the readme and help
+    viewers
+
+    ? does it the other way around
+
+    ^C-A go to the beginning (also with HOME)
+
+    ^C-E go to end of list (also with END)
+
+    PGDOWN one page down
+
+    PGUP one page up
+
+  Operations
+    i install selected module(s)
+
+    u uninstall selected module(s)
+
+    d download selected module(s)
+
+    r display readme of active module
+
+    c display test results for active module
+
+    y show perldoc of currently selected installed module
+
+    b write an autobundle of all your currently installed modules
+
+    z open command prompt
+
+    R reload installed selection
+
+  Local Administration
+    ! eval a Perl expression
+
+    % execute a shell expression
+
+    g redraw screen
+
+    e add directories to your @INC
+
+    s set configuration options for this session
+
+    p print error stack
+
+    r reload CPAN indices
+
+    D show currently installed modules dependencies
+
+    S show some statistical information
+
+  Step by Step
+    For easy stepping through the installation steps, shortcuts are
+    provided:
+
+    1 fetch modules
+
+    2 extract modules (not implemented yet)
+
+    3 make all
+
+    4 make test
+
+    5 make install
+
+CONFIGURATION
+    To enter the configuration window, type 's'. All values which are either
+    yes or no are shown with a Y or N value. To change this value just enter
+    what you want it to be. ;-) Some special input is required for the
+    options Makeflags, Makemakerflage and lib. The syntax for Makeflags and
+    Makemakerflags is "key=value", multiple keys can be seperated by ":" The
+    syntax for Lib is a ":" seperated list of lib directories.
+
+TODO
+    Updating isn't that nice as it could be.
+    Testing it on other platforms
+
+BUGS
+    *   Curses.pm 1.06 does not compile with Perl 5.8.0, a new release that
+        fixes those bugs is expected soon
+
+    *   It is too slow :-)
+
+    *   Documentation needed
+
+    *   As it is a development version based on a development version of
+        CPANPLUS please test it against the latest devel version of
+        CPANPLUS. Afterwards feel free to contact me about any bugs.
+
+AUTHOR
+    Marcus Thiesen (marcus@cpan.thiesenweb.de)
+
+SEE ALSO
+    CPANPLUS Curses Curses::UI ncurses perl
+
