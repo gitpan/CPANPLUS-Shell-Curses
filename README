@@ -17,6 +17,7 @@ USAGE
 
 KEYS
   General
+
     h detailed help
 
     q exit
@@ -24,6 +25,7 @@ KEYS
     v version information
 
   Search
+
     a search by author(s)
 
     A search modules by the author of the currently active module
@@ -46,6 +48,7 @@ KEYS
     w show search cache
 
   List window functions
+
     / does a search in the list window as well in the readme and help
     viewers
 
@@ -60,7 +63,10 @@ KEYS
     PGUP one page up
 
   Operations
+
     i install selected module(s)
+
+    I set installation parameters
 
     u uninstall selected module(s)
 
@@ -78,7 +84,10 @@ KEYS
 
     R reload installed selection
 
+    B select all (be carefull)
+
   Local Administration
+
     ! eval a Perl expression
 
     % execute a shell expression
@@ -91,13 +100,14 @@ KEYS
 
     p print error stack
 
-    r reload CPAN indices
+    x reload CPAN indices
 
     D show currently installed modules dependencies
 
     S show some statistical information
 
   Step by Step
+
     For easy stepping through the installation steps, shortcuts are
     provided:
 
@@ -117,21 +127,21 @@ CONFIGURATION
     what you want it to be. ;-) Some special input is required for the
     options Makeflags, Makemakerflage and lib. The syntax for Makeflags and
     Makemakerflags is "key=value", multiple keys can be seperated by ":" The
-    syntax for Lib is a ":" seperated list of lib directories.
+    syntax for Lib is a ":" seperated list of lib directories. You can apply
+    changes by hitting enter and abort the configuration by hitting ESC.
 
 TODO
     Updating isn't that nice as it could be.
     Testing it on other platforms
-
 BUGS
-    *   Curses.pm 1.06 does not compile with Perl 5.8.0, a new release that
+        Curses.pm 1.06 does not compile with Perl 5.8.0, a new release that
         fixes those bugs is expected soon
 
-    *   It is too slow :-)
+        It is too slow :-)
 
-    *   Documentation needed
+        Documentation needed
 
-    *   As it is a development version based on a development version of
+        As it is a development version based on a development version of
         CPANPLUS please test it against the latest devel version of
         CPANPLUS. Afterwards feel free to contact me about any bugs.
 
@@ -139,5 +149,6 @@ AUTHOR
     Marcus Thiesen (marcus@cpan.thiesenweb.de)
 
 SEE ALSO
-    CPANPLUS Curses Curses::UI ncurses perl
+    the CPANPLUS manpage the Curses manpage the Curses::UI manpage the
+    ncurses manpage the perl manpage
 

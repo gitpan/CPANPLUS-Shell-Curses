@@ -13,7 +13,7 @@ use warnings;
 BEGIN {
     use vars        qw( $VERSION @ISA);
     @ISA        =   qw( CPANPLUS::Shell::_Base );
-    $VERSION    =   '0.01';
+    $VERSION    =   '0.02';
 }
 
 use CPANPLUS::Backend;
@@ -71,11 +71,32 @@ my $default_mode = {
     5   => "_install_install_init",
 
     A => "_search_module_author",
+    B => "_select_all",
+#   C => "",
+    D => "_show_deps",
+#   E => "",
+#   F => "",
+#   G => "",
+#   H => "",
+    I => "_install_params_init",
+#   J => "",
+#   K => "",
+#   L => "",
     M => "_search_namespace_module",
     N => "_search_namespace_module2",
+#   O => "",
+#   P => "",
+#   Q => "",
     R => "_show_installed",
-    D => "_show_deps",
     S => "_show_stats"
+#   T => "",
+#   U => "",
+#   V => "",
+#   W => "",
+#   X => "",
+#   Y => "",
+#   Z => "",
+
 };
 
 sub new {
@@ -92,6 +113,7 @@ sub new {
 my $mainw;
 my $cpanp;
 my $data;
+my %install_params;
 sub shell {
     ### Init CPANPLUS
     $cpanp = new CPANPLUS::Backend;
@@ -157,6 +179,8 @@ sub shell {
     $list->set_routine("_show_installed", \&_show_installed);
     $list->set_routine("_show_deps", \&_show_deps);
     $list->set_routine("_show_stats", \&_show_stats);
+    $list->set_routine("_select_all", \&_select_all);
+    $list->set_routine("_install_params_init", \&_install_params_init);
 
     foreach my $key (keys %$default_mode) {
 	$list->set_binding($default_mode->{$key}, $key);
@@ -192,13 +216,24 @@ sub init_screen{
     my $display_height = 7;
     my $listw_height =$max_x - $top_height - $display_height;
 
-    my $topw = $mainw->add('topw','Window','-height' => $top_height, '-border' => 1, '-title' => loc('CPANPLUS CURSES SHELL'));
+    my $topw = $mainw->add('topw',
+			   'Window',
+			   '-height' => $top_height,
+			   '-border' => 1, 
+			   '-title' => loc('CPANPLUS CURSES SHELL')
+			   );
 
-    my $listw = $mainw->add('listw','Window','-height' => $listw_height, '-border' => 1, 
-			    '-y'=> $top_height);
+    my $listw = $mainw->add('listw',
+			    'Window',
+			    '-height' => $listw_height,
+			    '-border' => 1, 
+			    '-y'=> $top_height
+			    );
 	                                                 
-
-    my $displayw = $mainw->add('displayw','Window','-height' => $display_height , '-border' => 1,
+    my $displayw = $mainw->add('displayw',
+			       'Window',
+			       '-height' => $display_height 
+			       , '-border' => 1,
 			       '-y'=> $top_height + $listw_height ,
                                 ); 
 
@@ -211,7 +246,12 @@ sub init_screen{
 
     my $display = $displayw->add('display','TextViewer','-wrapping' => 1);
 
-    my $list = $listw->add('list','Listbox','vscrollbar' => 'right', '-multi' => 1);
+    my $list = $listw->add('list',
+			   'Listbox',
+			   'vscrollbar' => 'right'
+			   , '-multi' => 1
+			   );
+
     $list->set_routine('_display_module_details',\&_display_module_details);
     $list->set_binding('_display_module_details', $list->KEY_ENTER());
     $list->onSelectionChange(\&_display_module_details);
@@ -234,19 +274,22 @@ sub _search_author_init{
     $topw->add('input','TextEntry','-x' => length($text));
     $topw->getobj('input')->set_routine("loose-focus", \&_search_author);
     $topw->getobj('input')->set_binding("loose-focus", $mainw->KEY_ENTER());
+    $topw->getobj('input')->set_routine("abort", \&_input_cleanup);
+    $topw->getobj('input')->set_binding("abort", $mainw->CUI_ESCAPE());
     $topw->getobj('input')->focus();
 }
 
 sub _search_author{
     my $input = shift;
-
-    $mainw->status(loc("Searching..."));
-    $data = $cpanp->search(type => 'author', list=> [$input->get()], 'data' => $data);
-    if (defined($data)) {
-	_display_results($data);
-	_show_installed();
-    } else {
-	$mainw->status(loc("Nothing found!"));
+    if ($input->get()) {
+	$mainw->status(loc("Searching..."));
+	$data = $cpanp->search(type => 'author', list=> [$input->get()], 'data' => $data);
+	if (defined($data) && (int keys %{$data} > 0)) {
+	    _display_results($data);
+	    _show_installed();
+	} else {
+	    $mainw->status(loc("Nothing found!"));
+	}
     }
     _input_cleanup();
 }
@@ -260,18 +303,23 @@ sub _search_module_init{
     $topw->add('input','TextEntry','-x' => length($text));
     $topw->getobj('input')->set_routine("loose-focus", \&_search_module);
     $topw->getobj('input')->set_binding("loose-focus", $mainw->KEY_ENTER());
+    $topw->getobj('input')->set_routine("abort", \&_input_cleanup);
+    $topw->getobj('input')->set_binding("abort", $mainw->CUI_ESCAPE());
     $topw->getobj('input')->focus();
 }
 
 sub _search_module{
     my $input = shift;
-    $mainw->status(loc("Searching..."));
-    $data = $cpanp->search(type => 'module', list=> [$input->get()], 'data' => $data);
-    if (defined($data)) {
-	_display_results($data);
-	_show_installed();
-    } else {
-	$mainw->status(loc("Nothing found!"));
+
+    if ($input->get()) {
+	$mainw->status(loc("Searching..."));
+	$data = $cpanp->search(type => 'module', list=> [$input->get()], 'data' => $data);
+	if (defined($data) && (int keys %{$data} > 0)) {
+	    _display_results($data);
+	    _show_installed();
+	} else {
+	    $mainw->error(loc("Nothing found!"));
+	}
     }
     _input_cleanup();
 }
@@ -285,20 +333,22 @@ sub _search_dist_init{
     $topw->add('input','TextEntry','-x' => length($text));
     $topw->getobj('input')->set_routine("loose-focus", \&_search_dist);
     $topw->getobj('input')->set_binding("loose-focus", $mainw->KEY_ENTER());
+    $topw->getobj('input')->set_routine("abort", \&_input_cleanup);
+    $topw->getobj('input')->set_binding("abort", $mainw->CUI_ESCAPE());
     $topw->getobj('input')->focus();
 }
 
 sub _search_dist{
     my $input = shift;
-
-    $mainw->status(loc("Searching..."));
-    my $results = $cpanp->search(type => 'distribution', list=> [$input->get()]);
-    if (defined($results)) {
-	_display_results($results);
-    } else {
-	$mainw->status(loc("Nothing found!"));
-    }
-    _input_cleanup();
+    if ($input->get()) {
+	$mainw->status(loc("Searching..."));
+	my $results = $cpanp->search(type => 'distribution', list=> [$input->get()]);
+	if (defined($results) && (int keys %{$data} > 0)) {
+	    _display_results($results);
+	} else {
+	    $mainw->error(loc("Nothing found!"));
+	}
+	_input_cleanup(); }
 }
 
 
@@ -472,13 +522,13 @@ sub _install{
     my %look_tbl;
     my @to_install;
 
-    foreach my $item (@instmods) {$look_tbl{$item} = 1; }
+    map $look_tbl{$_}++, @instmods;
+ 
     foreach my $item (@selection) {
 	unless ($look_tbl{$item}) {
 	    push @to_install, $item;
 	}
     }
-
 
     my $err = $cpanp->error_object();
     ###
@@ -493,16 +543,16 @@ sub _install{
     print loc("Went back to shell to install: ") . "\n" . join("\n", @to_install);
     print "\n";
    
-    foreach my $mod (@to_install) {
+    my $iresult = $cpanp->install(modules => \@to_install, 
+				  'target' => $target,
+				  %install_params);
 
-	my $iresult = $cpanp->install(modules => [$mod], 'target' => $target);
-
-	if ($iresult->ok()) {
-	    push @endmessage, $mod . loc(" installed successfully");
-	} else {
-	    push @endmessage, loc("Error installing ") . $mod . "\n" . $err->stack();
-	}
+    if ($iresult->ok()) {
+	push @endmessage, loc("All modules installed successfully");
+    } else {
+	    @endmessage = $err->stack();
     }
+
     _show_installed();	
     _draw();
     reset_curses();
@@ -555,15 +605,15 @@ sub _uninstall{
 	}		     
 
     my @endmessage;
-    foreach my $mod (@to_uninstall) {
-	$mainw->status(loc('Currently uninstalling ') . $mod);
-	my $iresult = $cpanp->uninstall(modules => [$mod]);
-	if ($iresult->ok()) {
-	    push @endmessage, $mod . loc(" removed successfully");
-	} else {
-	   push @endmessage, loc("Error removing ") . $mod . "\n" . $err->stack();
-	}
+    
+    my $iresult = $cpanp->uninstall(modules => \@to_uninstall);
+
+    if ($iresult->ok()) {
+	push @endmessage, loc("All modules uninstalled successfully");
+    } else {
+	    @endmessage = $err->stack();
     }
+
     _show_installed();
     _draw();
     $mainw->dialog(join("\n", @endmessage));
@@ -627,12 +677,13 @@ sub _uptodate{
     my $list = $mainw->getobj('listw')->getobj('list');
     
     $list->set_routine('leave-update', \&leave_update);
-    $list->set_binding('leave-update', keys %$default_mode);
+    $list->set_binding('leave-update', 'i', 'u');
     $list->set_routine('abort-update', \&abort_update);
-    $list->set_binding('abort-update', 'q');
+    $list->set_binding('abort-update', 'q', $mainw->CUI_ESCAPE());
+    $list->set_binding('_select_all' , 'B');
 
     my @message = (
-		   loc('Select all packages you want to update, then hit any key to install updates'),
+		   loc('Select all packages you want to update, then hit i to install updates'),
 		   loc('To abort, press q')
 		   );
     _draw();
@@ -652,18 +703,16 @@ sub leave_update{
     print "\n";
 
     my @endmessage;
-    foreach my $mod (@selection) {
-
-	my $iresult = $cpanp->install(modules => [$mod], 
+    
+    my $iresult = $cpanp->install(modules => \@selection,
 				      target => 'install');
+    if ($iresult->ok()) {
+	push @endmessage, loc("All modules updated successfully");
+    } else {
+	   @endmessage = $err->stack();
+    }
 
-	if ($iresult->ok()) {
-	    push @endmessage, $mod . loc(" updated successfully");
-	} else {
-
-	   push @endmessage, loc("Error updates ") . $mod . "\n" . $err->stack();
-	}
-   }
+    #Reset default bindings
     foreach my $key (keys %$default_mode) {
 	$list->set_binding($default_mode->{$key}, $key);
     }
@@ -685,7 +734,7 @@ sub abort_update{
 sub _eval_expr_init{
     my $topw = $mainw->getobj('topw');
 
-    my $text = loc("Perl Expression:");
+    my $text = loc("Perl Expression: ");
 
     $topw->getobj('talk')->text($text);
     $topw->add('input','TextEntry','-x' => length($text));
@@ -700,6 +749,41 @@ sub _eval_expr{
 
     $mainw->status(loc("Executing..."));
     eval($expr);
+    $mainw->error($@ . "\n" . $!) if ($@) or ($!);
+    _input_cleanup();
+    _draw();
+}
+sub _install_params_init{
+    my $topw = $mainw->getobj('topw');
+
+    my $text = loc("Install params: ");
+
+    my $preset;
+    foreach my $key (keys %install_params) {
+	$preset .= " $key => $install_params{$key}, ";
+    }
+
+    $topw->getobj('talk')->text($text);
+    $topw->add('input','TextEntry','-x' => length($text));
+    $topw->getobj('input')->text($preset);
+    $topw->getobj('input')->set_routine("loose-focus", \&_install_params);
+    $topw->getobj('input')->set_binding("loose-focus", $mainw->KEY_ENTER());
+    $topw->getobj('input')->focus();
+}
+
+sub _install_params{
+    my $input = shift;
+    my $params = $input->get();
+    %install_params = ();
+
+    my @params = split ",", $params;
+    foreach my $param (@params) {
+	my ($key, $value) = split /=>?/, $param;
+	if (defined($key) and ($value)) {
+	    $install_params{$key} = $value;
+	}
+    }
+
     _input_cleanup();
     _draw();
 }
@@ -707,7 +791,7 @@ sub _eval_expr{
 sub _eval_shell_init{
     my $topw = $mainw->getobj('topw');
 
-    my $text = loc("Shell Expression:");
+    my $text = loc("Shell Expression: ");
 
     $topw->getobj('talk')->text($text);
     $topw->add('input','TextEntry','-x' => length($text));
@@ -849,6 +933,8 @@ sub _set_conf{
 	    }
 	    $entry->set_routine('_store_conf', \&_store_conf);
 	    $entry->set_binding('_store_conf', $mainw->KEY_ENTER() );
+	    $entry->set_routine('_abort_conf', \&_abort_conf);
+	    $entry->set_binding('_abort_conf', $mainw->CUI_ESCAPE() );
 	}
 	$posy++;
     }
@@ -917,6 +1003,12 @@ sub _store_conf{
     ### Somewhere here something odd happens, the curses
     ### appears in the list. No workaround till now, 
     ### maybe a bug in Curses::UI
+}
+
+sub _abort_conf{
+    $mainw->getobj('configw')->loose_focus();
+    $mainw->delete('configw');
+    $mainw->getobj('listw')->getobj('list')->focus();
 }
 
 sub _draw{
@@ -1135,6 +1227,7 @@ sub _show_banner{
 
     my @text = ( 
 		 loc('                  CPANPLUS::SHELL::Curses                    '),
+		     '                         ' . $VERSION ,
 		 loc('        Visual CPAN exploration and module installation      '),     
 		 loc('    Please report bugs to <marcus@cpan.thiesenweb.de>. '),
 		 loc(' Using CPANPLUS::Backend v0.050.  ReadLine support enabled.  ')
@@ -1163,7 +1256,7 @@ sub _search_module_author{
 	_display_results($data);
 	_show_installed();
     } else {
-	$mainw->status(loc("Nothing found!"));
+	$mainw->error(loc("Nothing found!"));
     }
 }
 
@@ -1182,7 +1275,7 @@ sub _search_namespace_module{
 	    _display_results($data);
 	    _show_installed();
 	} else {
-	    $mainw->status(loc("Nothing found!"));
+	    $mainw->error(loc("Nothing found!"));
 	}
     }
     $mainw->nostatus();
@@ -1203,7 +1296,7 @@ sub _search_namespace_module2{
 	    _display_results($data);
 	    _show_installed();
 	} else {
-	    $mainw->status(loc("Nothing found!"));
+	    $mainw->error(loc("Nothing found!"));
 	}
     }
     $mainw->nostatus();
@@ -1264,6 +1357,13 @@ sub _show_stats{
 		    );
 }
 
+sub _select_all{
+    my $list = $mainw->getobj('listw')->getobj('list');
+
+    for my $i (0..keys %{$data}) {
+	$list->set_selection($i);
+    }
+}
 
 1;
 
@@ -1345,9 +1445,12 @@ PGDOWN  one page down
 
 PGUP    one page up
 
+
 =head2 Operations
 
 i      install selected module(s)
+
+I      set installation parameters
 
 u      uninstall selected module(s)
 
@@ -1367,6 +1470,8 @@ z      open command prompt
 
 R      reload installed selection
 
+B      select all (be carefull)
+
 =head2 Local Administration
 
 !      eval a Perl expression
@@ -1381,7 +1486,7 @@ s      set configuration options for this session
 
 p      print error stack
 
-r      reload CPAN indices
+x      reload CPAN indices
 
 D      show currently installed modules dependencies
 
@@ -1414,6 +1519,8 @@ The syntax for Makeflags and Makemakerflags is C<key=value>,
 multiple keys can be seperated by C<:>
 The syntax for Lib is a C<:> seperated list of lib 
 directories.
+You can apply changes by hitting enter and abort the
+configuration by hitting ESC.
 
 =head1 TODO
 

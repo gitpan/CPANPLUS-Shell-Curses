@@ -11,6 +11,7 @@ WriteMakefile(
 	      PREREQ_PM => {
 		  'Curses::UI'          => 0.72,
 		  'Module::ScanDeps'    => 0,
+		  'File::chdir'         => 0,
 	      },
 
 	      ABSTRACT_FROM => $mainfile,
